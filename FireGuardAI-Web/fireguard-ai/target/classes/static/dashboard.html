@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FireGuard AI - Control Center</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0c0c1a, #1a0d2e, #1e1a3c);
+            color: #e2e8f0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden; 
+        }
+
+        /* LAYOUT */
+        .container { display: flex; height: 100vh; width: 100vw; }
+        .main {
+            flex: 1; padding: 16px; display: flex; flex-direction: column;
+            height: 100vh; overflow: hidden; position: relative;
+        }
+
+        /* HEADER */
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 16px; background: rgba(30, 26, 60, 0.5); padding: 12px 20px;
+            border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05); flex-shrink: 0;
+        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .logo { font-size: 20px; font-weight: 800; color: #a855f7; display: flex; align-items: center; gap: 10px; }
+        .header-divider { width: 2px; height: 24px; background: rgba(255,255,255,0.1); border-radius: 2px; }
+        .title { font-size: 20px; font-weight: 700; background: linear-gradient(to right, #a855f7, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .live-indicator { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #94a3b8; }
+        .dot { width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; animation: pulse-dot 2s infinite; }
+
+        /* GRID */
+        .grid {
+            flex: 1; display: grid; grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: auto 1fr; gap: 16px; min-height: 0;
+        }
+
+        /* STACKED COLUMNS */
+        .stacked-col { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+        .stacked-col .card { flex: 1; min-height: 0; padding: 12px 16px; }
+
+        /* CARDS */
+        .card {
+            background: rgba(30, 26, 60, 0.6); backdrop-filter: blur(10px);
+            border-radius: 16px; padding: 16px; border: 1px solid rgba(168, 85, 247, 0.15);
+            display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        .card-header {
+            font-size: 13px; color: #94a3b8; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;
+        }
+
+        /* METRIC VALUES */
+        .metric-display {
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            flex: 1; margin-bottom: 10px;
+        }
+        .metric-value { font-size: 56px; font-weight: 800; color: #fff; transition: color 0.3s; line-height: 1; }
+        .metric-value.danger { color: #ef4444; text-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+
+        /* AI RISK PANEL */
+        .ai-value { font-size: 34px; font-weight: 800; color: #10b981; margin-top: auto; text-align: center; transition: color 0.3s; }
+        .risk-bar-bg { margin-top: 12px; height: 8px; background: rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden; }
+        .risk-bar { height: 100%; width: 0%; background: #10b981; border-radius: 10px; transition: width 0.5s ease-out, background 0.3s; }
+        .risk-label { font-size: 12px; margin-top: 8px; color: #94a3b8; text-align: center; font-weight: 600; }
+
+        /* BADGES */
+        .badge { padding: 4px 10px; border-radius: 50px; font-size: 10px; font-weight: 700; }
+        .badge.safe { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge.warning { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .badge.danger { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); animation: blink 1s infinite;}
+
+        /* COUNTERMEASURE PANEL */
+        .cm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; }
+        .cm-item {
+            background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px;
+            display: flex; flex-direction: column; justify-content: space-between; gap: 8px;
+            border: 1px solid rgba(255,255,255,0.05); transition: 0.3s;
+        }
+        .cm-item.active-safe { border-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .cm-item.active-danger { border-color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .cm-title { font-size: 11px; color: #94a3b8; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .cm-status { font-size: 14px; font-weight: 700; color: #fff; }
+        .cm-status.on { color: #10b981; }
+        .cm-status.off { color: #ef4444; }
+
+        .dispatch-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+        .dispatch-item {
+            font-size: 12px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 6px;
+            display: flex; justify-content: space-between; align-items: center; color: #94a3b8;
+        }
+        .dispatch-item.dispatched { background: rgba(239, 68, 68, 0.15); color: #fca5a5; font-weight: 600; border-left: 3px solid #ef4444; }
+
+        /* BUTTONS */
+        .actions { display: flex; gap: 8px; margin-top: 12px; }
+        .btn { flex: 1; padding: 8px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12px; transition: 0.2s; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .btn-primary { background: #6366f1; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .shortcut-hint { display: block; font-size: 9px; opacity: 0.7; margin-top: 2px; font-weight: 400; }
+        .manual-sms-group { display: flex; gap: 8px; margin-top: 12px; }
+        .manual-sms-group input { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 8px; padding: 8px 12px; font-size: 12px; }
+        .manual-sms-group input:focus { outline: none; border-color: #6366f1; }
+
+        /* BUILDING MAP */
+        .building-map { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-right: 5px; }
+        .floor { background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px; }
+        .floor-title { font-size: 10px; color: #94a3b8; margin-bottom: 6px; letter-spacing: 0.5px; }
+        .rooms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .room { background: rgba(255,255,255,0.05); text-align: center; padding: 6px 4px; border-radius: 6px; font-size: 11px; font-weight: 600; transition: 0.3s; }
+        .room.alert-level-1 { background: #f59e0b; color: white; }
+        .room.alert-level-2 { background: #ef4444; color: white; box-shadow: 0 0 10px rgba(239, 68, 68, 0.6); animation: blink 1s infinite; }
+
+        /* LISTS (Log & SMS) */
+        .log-container { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 5px; }
+        .log-entry { font-size: 11px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.03); border-left: 3px solid #10b981; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .log-entry.warning { background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; }
+        .log-entry.danger { background: rgba(239, 68, 68, 0.1); border-left: 3px solid #ef4444; }
+        .log-content { display: flex; flex-direction: column; gap: 3px; }
+        .log-target { font-weight: 700; color: #cbd5e1; font-size: 10px;}
+        .log-time { color: #94a3b8; font-size: 10px; white-space: nowrap; }
+
+        /* TOAST NOTIFICATIONS */
+        .toast-container { position: absolute; top: 20px; right: 50%; transform: translateX(50%); display: flex; flex-direction: column; gap: 10px; z-index: 1000; pointer-events: none; }
+        .toast { background: rgba(30, 26, 60, 0.95); backdrop-filter: blur(10px); border-radius: 12px; padding: 16px 24px; min-width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 5px; border-left: 4px solid #3b82f6; animation: slideDown 0.3s ease-out forwards; pointer-events: auto; }
+        .toast.warning { border-color: #f59e0b; }
+        .toast.danger { border-color: #ef4444; background: rgba(60, 20, 20, 0.95); }
+        .toast-title { font-weight: 800; font-size: 14px; color: #fff; }
+        .toast-msg { font-size: 12px; color: #cbd5e1; }
+
+        /* SCROLLBARS */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 10px; }
+
+        /* ANIMATIONS */
+        @keyframes blink { 0% { opacity: 1 } 50% { opacity: 0.5 } 100% { opacity: 1 } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
+        @keyframes pulse-dot { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+    </style>
+</head>
+
+<body>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="container">
+        <div class="main">
+            <div class="header">
+                <div class="header-left">
+                    <div class="logo"><i class="fas fa-shield-alt"></i> FireGuard AI</div>
+                    <div class="header-divider"></div>
+                    <div class="title">Command Center</div>
+                </div>
+                <div class="live-indicator"><div class="dot"></div>Real-time IoT Data</div>
+            </div>
+
+            <div class="grid">
+                <div class="card">
+                    <div class="card-header">
+                        <span>Gas Level (PPM)</span>
+                        <span class="badge safe" id="gasBadge">SAFE</span>
+                    </div>
+                    <div class="metric-display">
+                        <div class="metric-value" id="gasValue">15</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span>Temperature (°C)</span>
+                        <span class="badge safe" id="tempBadge">SAFE</span>
+                    </div>
+                    <div class="metric-display">
+                        <div class="metric-value" id="tempValue">24</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">AI Risk Prediction</div>
+                    <div id="fireRiskValue" class="ai-value">0%</div>
+                    <div class="risk-bar-bg"><div id="riskBar" class="risk-bar"></div></div>
+                    <div id="riskLabel" class="risk-label">Analyzing Data...</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">System Response Level</div>
+                    <div class="metric-display" style="margin-bottom: 0;">
+                        <div class="metric-value" id="sysLevel" style="font-size: 28px; color: #10b981;">ALL CLEAR</div>
+                        <div id="sysDesc" style="font-size: 12px; color: #94a3b8; margin-top: 10px; text-align: center;">Routine Monitoring Active</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-primary" onclick="acknowledgeAlert()">
+                            Acknowledge <span class="shortcut-hint">[Enter]</span>
+                        </button>
+                        <button class="btn btn-danger" id="sosBtn" style="display:none" onclick="triggerSOS()">
+                            Trigger SOS <span class="shortcut-hint">[Esc]</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stacked-col">
+                    <div class="card">
+                        <div class="card-header">Live Floor Map</div>
+                        <div class="building-map">
+                            <div class="floor">
+                                <div class="floor-title">FLOOR 2</div>
+                                <div class="rooms">
+                                    <div class="room" id="room-201">201</div>
+                                    <div class="room" id="room-202">202</div>
+                                    <div class="room" id="room-203">203</div>
+                                </div>
+                            </div>
+                            <div class="floor">
+                                <div class="floor-title">FLOOR 1</div>
+                                <div class="rooms">
+                                    <div class="room" id="room-101">101</div>
+                                    <div class="room" id="room-102">102</div>
+                                    <div class="room" id="room-103">103</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">Event Log</div>
+                        <div class="log-container" id="alertLog">
+                            <div class="log-entry">
+                                <span>System Initialized Safely</span>
+                                <span class="log-time">Now</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">SMS Dispatch System</div>
+                    <div class="log-container" id="smsLog">
+                        <div class="log-entry">
+                            <div class="log-content">
+                                <span class="log-target">SYSTEM</span>
+                                <span>SMS Gateway Online & Ready.</span>
+                            </div>
+                            <span class="log-time">Now</span>
+                        </div>
+                    </div>
+                    <div class="manual-sms-group">
+                        <input type="text" id="manualSmsInput" placeholder="Type broadcast msg..." onkeydown="if(event.key === 'Enter') sendManualSMS()">
+                        <button class="btn btn-primary" onclick="sendManualSMS()" style="flex: none; padding: 0 16px;">Send</button>
+                    </div>
+                </div>
+
+                <div class="card" style="grid-column: 3 / 5;">
+                    <div class="card-header">Active Countermeasures & Dispatch</div>
+                    
+                    <div class="cm-grid">
+                        <div class="cm-item" id="valveStatusBox">
+                            <div class="cm-title"><i class="fas fa-gas-pump"></i> Main Gas Valve</div>
+                            <div class="cm-status on" id="valveText">OPEN</div>
+                        </div>
+                        <div class="cm-item" id="fanStatusBox">
+                            <div class="cm-title"><i class="fas fa-fan"></i> Exhaust System</div>
+                            <div class="cm-status off" id="fanText">STANDBY</div>
+                        </div>
+                        <div class="cm-item" id="sirenStatusBox">
+                            <div class="cm-title"><i class="fas fa-bullhorn"></i> Building Siren</div>
+                            <div class="cm-status off" id="sirenText">INACTIVE</div>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; justify-content: space-between;">
+                            <div class="cm-title" style="margin-bottom: 5px;"><i class="fas fa-truck-medical"></i> Level 3 Emergency Dispatch Status</div>
+                            <div class="dispatch-list">
+                                <div class="dispatch-item" id="dispFire"><i class="fas fa-fire-truck"></i> Fire Department <span>Standby</span></div>
+                                <div class="dispatch-item" id="dispMed"><i class="fas fa-ambulance"></i> Nearest Hospital <span>Standby</span></div>
+                                <div class="dispatch-item" id="dispPol"><i class="fas fa-car-police"></i> Police Station <span>Standby</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* RESIDENT DATABASE */
+        const residents = {
+            "101": { owner: "Raj Sharma" }, "102": { owner: "Amit Verma" }, "103": { owner: "Sunil Gupta" },
+            "201": { owner: "Vikas Singh" }, "202": { owner: "Rahul Mehta" }, "203": { owner: "Karan Kapoor" }
+        };
+        const rooms = Object.keys(residents);
+
+        /* AI RISK ALGORITHM */
+        function predictFireRisk(gas, temp) { return Math.min(100, Math.round((gas * 0.6 + temp * 0.4))); }
+
+        /* TOAST NOTIFICATION SYSTEM */
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<div class="toast-title">${title}</div><div class="toast-msg">${message}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.animation = 'fadeOut 0.3s ease-out forwards'; setTimeout(() => toast.remove(), 300); }, 4000);
+        }
+
+        /* LOGGING SYSTEMS */
+        function addLog(msg, type = '') {
+            const log = document.getElementById("alertLog");
+            const entry = document.createElement("div");
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `<span>${msg}</span><span class="log-time">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'})}</span>`;
+            log.prepend(entry);
+            if(log.children.length > 3) log.removeChild(log.lastChild); 
+        }
+
+        function addSmsLog(target, msg, type = 'info') {
+            const log = document.getElementById("smsLog");
+            const entry = document.createElement("div");
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `<div class="log-content"><span class="log-target">TO: ${target.toUpperCase()}</span><span>${msg}</span></div><span class="log-time">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>`;
+            log.prepend(entry);
+            if(log.children.length > 5) log.removeChild(log.lastChild); 
+        }
+
+        function sendManualSMS() {
+            const input = document.getElementById("manualSmsInput");
+            const text = input.value.trim();
+            if(!text) return;
+            addSmsLog("ALL RESIDENTS", text, "warning");
+            showToast("Broadcast Sent", "Message dispatched to all resident terminals.", "warning");
+            addLog("Manual resident broadcast initiated", "warning");
+            input.value = "";
+        }
+
+        /* HARDWARE UI CONTROLS */
+        function updateHardware(valve, fan, siren, emergency) {
+            const vBox = document.getElementById("valveStatusBox"); const vText = document.getElementById("valveText");
+            if (valve === 'CLOSED') { vBox.className = "cm-item active-danger"; vText.className = "cm-status off"; vText.textContent = "CLOSED (ISOLATED)"; } 
+            else { vBox.className = "cm-item"; vText.className = "cm-status on"; vText.textContent = "OPEN"; }
+
+            const fBox = document.getElementById("fanStatusBox"); const fText = document.getElementById("fanText");
+            if (fan === 'ON') { fBox.className = "cm-item active-safe"; fText.className = "cm-status on"; fText.textContent = "ACTIVE (VENTING)"; } 
+            else { fBox.className = "cm-item"; fText.className = "cm-status off"; fText.textContent = "STANDBY"; }
+
+            const sBox = document.getElementById("sirenStatusBox"); const sText = document.getElementById("sirenText");
+            if (siren === 'ON') { sBox.className = "cm-item active-danger"; sText.className = "cm-status off"; sText.textContent = "ACTIVE (EVACUATE)"; } 
+            else { sBox.className = "cm-item"; sText.className = "cm-status off"; sText.textContent = "INACTIVE"; }
+
+            const dFire = document.getElementById("dispFire"); const dMed = document.getElementById("dispMed"); const dPol = document.getElementById("dispPol");
+            if (emergency === 'DISPATCHED') {
+                dFire.className = "dispatch-item dispatched"; dFire.innerHTML = `<i class="fas fa-fire-truck"></i> Fire Department <span>EN ROUTE</span>`;
+                dMed.className = "dispatch-item dispatched"; dMed.innerHTML = `<i class="fas fa-ambulance"></i> Nearest Hospital <span>NOTIFIED</span>`;
+                dPol.className = "dispatch-item dispatched"; dPol.innerHTML = `<i class="fas fa-car-police"></i> Police Station <span>NOTIFIED</span>`;
+            } else {
+                dFire.className = "dispatch-item"; dFire.innerHTML = `<i class="fas fa-fire-truck"></i> Fire Department <span>Standby</span>`;
+                dMed.className = "dispatch-item"; dMed.innerHTML = `<i class="fas fa-ambulance"></i> Nearest Hospital <span>Standby</span>`;
+                dPol.className = "dispatch-item"; dPol.innerHTML = `<i class="fas fa-car-police"></i> Police Station <span>Standby</span>`;
+            }
+        }
+
+        /* --- REALISTIC SENSOR SIMULATION ENGINE --- */
+        let currentLevel = 0; 
+        
+        let simGas = 15;
+        let simTemp = 24;
+        let simState = 'NORMAL'; 
+        let simRoom = null;
+        let tickCount = 0;
+
+        function runSimulation() {
+            tickCount++;
+
+            if (simState === 'NORMAL') {
+                simGas += Math.floor(Math.random() * 3) - 1; 
+                simTemp += Math.floor(Math.random() * 3) - 1;
+
+                simGas = Math.max(10, Math.min(25, simGas));
+                simTemp = Math.max(20, Math.min(28, simTemp));
+
+                if (tickCount > 4 && Math.random() > 0.6) {
+                    simState = 'ESCALATING';
+                    simRoom = rooms[Math.floor(Math.random() * rooms.length)];
+                    addLog(`System detecting anomaly in Room ${simRoom}...`, "");
+                }
+            } 
+            else if (simState === 'ESCALATING') {
+                simGas += Math.floor(Math.random() * 12) + 4; 
+                simTemp += Math.floor(Math.random() * 8) + 3; 
+
+                if (simGas > 85 || simTemp > 85) {
+                    simState = 'CRITICAL';
+                }
+            }
+            else if (simState === 'CRITICAL') {
+                simGas += Math.floor(Math.random() * 5) - 2;
+                simTemp += Math.floor(Math.random() * 5) - 2;
+                simGas = Math.max(85, Math.min(99, simGas));
+                simTemp = Math.max(85, Math.min(99, simTemp));
+            }
+            else if (simState === 'RECOVERING') {
+                simGas -= Math.floor(Math.random() * 15) + 5;
+                simTemp -= Math.floor(Math.random() * 10) + 5;
+
+                if (simGas <= 25 && simTemp <= 28) {
+                    simState = 'NORMAL';
+                    tickCount = 0;
+                    simRoom = null;
+                }
+            }
+
+            return { gas: simGas, temp: simTemp, room: simRoom || rooms[0] };
+        }
+
+        /* UPDATE LOOP */
+        function updateData() {
+            let sensorData = runSimulation();
+            let gas = sensorData.gas;
+            let temp = sensorData.temp;
+            let room = sensorData.room;
+
+            document.getElementById("gasValue").textContent = gas;
+            document.getElementById("gasValue").className = gas > 60 ? "metric-value danger" : "metric-value";
+            document.getElementById("gasBadge").textContent = gas > 60 ? "DANGER" : "SAFE";
+            document.getElementById("gasBadge").className = gas > 60 ? "badge danger" : "badge safe";
+
+            document.getElementById("tempValue").textContent = temp;
+            document.getElementById("tempValue").className = temp > 70 ? "metric-value danger" : "metric-value";
+            document.getElementById("tempBadge").textContent = temp > 70 ? "DANGER" : "SAFE";
+            document.getElementById("tempBadge").className = temp > 70 ? "badge danger" : "badge safe";
+
+            let risk = predictFireRisk(gas, temp);
+            document.getElementById("fireRiskValue").textContent = risk + "%";
+            let bar = document.getElementById("riskBar");
+            bar.style.width = risk + "%";
+
+            let newLevel = 0;
+            let owner = residents[room].owner;
+            let sysLvlText = document.getElementById("sysLevel");
+            let sysDescText = document.getElementById("sysDesc");
+            let sosBtn = document.getElementById("sosBtn");
+
+            rooms.forEach(r => document.getElementById(`room-${r}`).className = "room");
+
+            if (risk < 40) {
+                newLevel = 0;
+                bar.style.background = "#10b981"; document.getElementById("fireRiskValue").style.color = "#10b981";
+                document.getElementById("riskLabel").textContent = "Normal Operating Conditions";
+                
+                sysLvlText.textContent = "ALL CLEAR"; sysLvlText.style.color = "#10b981";
+                sysDescText.textContent = "Routine Monitoring Active";
+                sosBtn.style.display = "none";
+                updateHardware('OPEN', 'OFF', 'OFF', 'STANDBY');
+                
+                if (currentLevel !== 0) {
+                    addLog("System returned to normal parameters.", "");
+                }
+            } 
+            else if (risk < 70) {
+                newLevel = 1;
+                bar.style.background = "#f59e0b"; document.getElementById("fireRiskValue").style.color = "#f59e0b";
+                document.getElementById("riskLabel").textContent = "Local Anomaly Detected";
+                
+                sysLvlText.textContent = "LEVEL 1 ALERT"; sysLvlText.style.color = "#f59e0b";
+                sysDescText.textContent = `Local mitigation active in Room ${room}`;
+                sosBtn.style.display = "none";
+                document.getElementById(`room-${room}`).className = "room alert-level-1";
+
+                updateHardware('CLOSED', 'ON', 'OFF', 'STANDBY');
+
+                if (currentLevel < 1) {
+                    showToast("Level 1 Triggered", `Local mitigation active for Room ${room}`, "warning");
+                    addLog(`Level 1: Auto-closed gas valve & activated exhaust in Room ${room}.`, "warning");
+                    addSmsLog(owner, `Notice: Elevated gas/temp detected in Room ${room}. Gas valve isolated automatically. No panic required.`, "warning");
+                }
+            } 
+            else if (risk < 85) {
+                newLevel = 2;
+                bar.style.background = "#ef4444"; document.getElementById("fireRiskValue").style.color = "#ef4444";
+                document.getElementById("riskLabel").textContent = "Escalation - Unable to control locally";
+                
+                sysLvlText.textContent = "LEVEL 2 ESCALATION"; sysLvlText.style.color = "#ef4444";
+                sysDescText.textContent = `Building-wide alert triggered. Origin: Room ${room}`;
+                sosBtn.style.display = "block";
+                document.getElementById(`room-${room}`).className = "room alert-level-2";
+
+                updateHardware('CLOSED', 'ON', 'ON', 'STANDBY');
+
+                if (currentLevel < 2) {
+                    showToast("Level 2 Triggered", `Building Siren Activated. Evacuating residents.`, "danger");
+                    addLog(`Level 2: Escalation protocol engaged. Origin: Room ${room}. Siren active.`, "danger");
+                    addSmsLog("ALL RESIDENTS", `EMERGENCY: Concentration increasing near Room ${room}. Evacuation required immediately.`, "danger");
+                }
+            } 
+            else {
+                newLevel = 3;
+                bar.style.background = "#ef4444"; document.getElementById("fireRiskValue").style.color = "#ef4444";
+                document.getElementById("riskLabel").textContent = "CRITICAL: FIRE OR EXPLOSION RISK";
+                
+                sysLvlText.textContent = "LEVEL 3 EMERGENCY"; sysLvlText.style.color = "#ef4444";
+                sysDescText.textContent = `External services dispatched to location.`;
+                sosBtn.style.display = "block";
+                document.getElementById(`room-${room}`).className = "room alert-level-2";
+
+                updateHardware('CLOSED', 'ON', 'ON', 'DISPATCHED');
+
+                if (currentLevel < 3) {
+                    showToast("🚨 LEVEL 3 BROADCAST", "Fire Dept, Hospital, and Police notified with live location.", "danger");
+                    addLog(`Level 3: Emergency services dispatched. Origin: Room ${room}.`, "danger");
+                    addSmsLog("ALL RESIDENTS", `CRITICAL EMERGENCY. DO NOT USE ELEVATORS. Fire department is en route to Room ${room}.`, "danger");
+
+                    // ==========================================
+                    // NEW: AUTOMATIC WHATSAPP ALERT TO YOUR JAVA BACKEND
+                    // ==========================================
+                    let autoMessage = `🚨 *FIREGUARD AI CRITICAL ALERT* 🚨\nFire probability is ${risk}% in Room ${room}. Please evacuate immediately!`;
+                    
+                    fetch('/api/whatsapp?message=' + encodeURIComponent(autoMessage), { method: 'POST' })
+                    .then(response => console.log("Automatic WhatsApp API called!"))
+                    .catch(e => console.error("Error calling backend:", e));
+                }
+            }
+
+            currentLevel = newLevel;
+        }
+
+        /* MANUAL OPERATOR CONTROLS */
+        function acknowledgeAlert() { 
+            showToast("System Acknowledged", "Command Center operator logged response. Initiating recovery...", "info"); 
+            
+            if (simState === 'CRITICAL' || simState === 'ESCALATING') {
+                simState = 'RECOVERING';
+                addLog("Manual suppression active. Metrics recovering...", "info");
+            }
+        }
+        
+        function triggerSOS() { 
+            showToast("SOS Triggered", "Manual Override: Full Level 3 Dispatch Initiated.", "danger");
+            updateHardware('CLOSED', 'ON', 'ON', 'DISPATCHED');
+            addSmsLog("ALL RESIDENTS", "MANUAL SOS TRIGGERED. EVACUATE THE BUILDING.", "danger");
+            addLog("MANUAL SOS OVERRIDE ACTIVATED", "danger");
+
+            // ==========================================
+            // NEW: MANUAL WHATSAPP ALERT TO YOUR JAVA BACKEND
+            // ==========================================
+            let emergencyMessage = "🚨 *FIREGUARD AI MANUAL SOS* 🚨\nEvacuate the building immediately! Fire department dispatched.";
+            
+            fetch('/api/whatsapp?message=' + encodeURIComponent(emergencyMessage), {
+                method: 'POST'
+            })
+            .then(response => console.log("Manual WhatsApp API called successfully!"))
+            .catch(error => console.error("Error calling backend:", error));
+        }
+
+        /* KEYBOARD SHORTCUTS */
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && document.activeElement.id !== 'manualSmsInput') {
+                e.preventDefault(); acknowledgeAlert();
+            } else if (e.key === 'Escape' && document.getElementById("sosBtn").style.display === "block") {
+                e.preventDefault(); triggerSOS();
+            }
+        });
+
+        /* TIMING SET TO 8 SECONDS (8000ms) */
+        setInterval(updateData, 8000); 
+    </script>
+</body>
+</html>
